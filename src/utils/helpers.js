@@ -44,7 +44,7 @@ export function filterCards(cards, selectedTags, query) {
         c.tags?.some((t) => t.toLowerCase().includes(q))
     )
   }
-  return result
+  return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
 
 export function getRelatedCards(cards, currentId, count = 4) {

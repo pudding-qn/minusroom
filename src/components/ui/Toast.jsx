@@ -7,10 +7,22 @@ export function Toast() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="animate-toast-in pointer-events-auto glass-card px-4 py-3 text-sm flex items-center gap-2 min-w-[200px]"
-          style={{ color: 'var(--text-primary)', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}
+          className="pointer-events-auto anim-slide-r"
+          style={{
+            background: 'var(--surface)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px 16px',
+            fontSize: 12,
+            fontWeight: 400,
+            letterSpacing: '0.02em',
+            color: 'var(--text-2)',
+            boxShadow: 'var(--shadow-md)',
+            minWidth: 180,
+          }}
         >
-          <span>{t.message}</span>
+          {t.message}
         </div>
       ))}
     </div>

@@ -1,58 +1,98 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
 import { getAllTags, filterCards, formatRelativeTime } from '../utils/helpers'
 
-// Card skeleton for processing state
-function CardSkeleton({ card }) {
+/* ── Skeleton card while AI processes ── */
+function SkeletonCard({ card }) {
   return (
-    <div className="glass-card p-5 flex flex-col gap-3 opacity-60">
-      <div className="flex items-center gap-2">
-        <span className="text-base">{card.sourceIcon}</span>
-        <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>{card.sourcePlatform}</span>
+    <div
+      className="m-card p-5"
+      style={{ opacity: 0.75 }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span style={{ color: 'var(--accent)', fontSize: 11 }}>{card.sourceIcon}</span>
+        <span className="text-[10px] tracking-wider uppercase" style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+          {card.sourcePlatform}
+        </span>
       </div>
-      <div className="shimmer-bg h-4 rounded-lg w-3/4" />
-      <div className="shimmer-bg h-3 rounded-lg w-full" />
-      <div className="shimmer-bg h-3 rounded-lg w-2/3" />
-      <div className="flex items-center gap-2 mt-1">
-        <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
-        <span className="text-xs font-light" style={{ color: 'var(--accent)' }}>AI 整理中…</span>
+      <div className="m-shimmer h-3.5 w-3/4 mb-2.5" />
+      <div className="m-shimmer h-2.5 w-full mb-1.5" />
+      <div className="m-shimmer h-2.5 w-2/3 mb-4" />
+      <div className="flex items-center gap-2">
+        <span className="processing-ring" style={{ width: 10, height: 10 }} />
+        <span className="text-[10px] tracking-[0.1em] uppercase font-light" style={{ color: 'var(--accent)' }}>
+          AI 整理中
+        </span>
       </div>
     </div>
   )
 }
 
-// Card component
-function CardItem({ card }) {
+/* ── Card item ── */
+function CardItem({ card, index }) {
   const navigate = useNavigate()
-  if (card.status === 'processing') return <CardSkeleton card={card} />
+  if (card.status === 'processing') return (
+    <div className={`anim-dissolve delay-${Math.min(index + 1, 8)}`}>
+      <SkeletonCard card={card} />
+    </div>
+  )
+
   return (
     <div
-      className="glass-card card-hover p-5 flex flex-col gap-3"
-      style={{ boxShadow: '0 2px 16px rgba(44,44,42,0.06)' }}
+      className={`m-card p-5 cursor-pointer group anim-dissolve delay-${Math.min(index + 1, 8)}`}
       onClick={() => navigate(`/space/card/${card.id}`)}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base flex-shrink-0">{card.sourceIcon}</span>
-          <span className="text-xs truncate" style={{ color: 'var(--text-ghost)' }}>{card.sourcePlatform}</span>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span style={{ color: 'var(--accent)', fontSize: 11, flexShrink: 0 }}>{card.sourceIcon}</span>
+          <span
+            className="text-[10px] tracking-wider uppercase"
+            style={{ color: 'var(--text-3)', fontWeight: 400, letterSpacing: '0.08em' }}
+          >
+            {card.sourcePlatform}
+          </span>
         </div>
-        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{formatRelativeTime(card.createdAt)}</span>
+        <span className="text-[10px]" style={{ color: 'var(--text-3)', fontWeight: 400, flexShrink: 0 }}>
+          {formatRelativeTime(card.createdAt)}
+        </span>
       </div>
-      <h3 className="text-sm font-medium leading-snug line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+
+      {/* Title */}
+      <h3
+        className="font-display text-base leading-snug mb-3 line-clamp-2"
+        style={{
+          color: 'var(--text-1)',
+          fontWeight: 400,
+          letterSpacing: '-0.01em',
+          transition: 'color 0.3s ease',
+        }}
+      >
         {card.title}
       </h3>
+
+      {/* Core idea */}
       {card.summary && (
-        <p className="text-xs font-light leading-relaxed line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
+        <p
+          className="text-xs leading-relaxed line-clamp-3 mb-4"
+          style={{ color: 'var(--text-2)', lineHeight: 1.8 }}
+        >
           {card.summary.coreIdea}
         </p>
       )}
-      {card.tags && card.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-1">
-          {card.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="tag-pill" style={{ fontSize: 11 }}>{tag}</span>
+
+      {/* Tags */}
+      {card.tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {card.tags.slice(0, 3).map(tag => (
+            <span key={tag} className="m-tag" style={{ fontSize: 10, padding: '2px 8px' }}>
+              {tag}
+            </span>
           ))}
           {card.tags.length > 3 && (
-            <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>+{card.tags.length - 3}</span>
+            <span className="text-[10px]" style={{ color: 'var(--text-3)', alignSelf: 'center' }}>
+              +{card.tags.length - 3}
+            </span>
           )}
         </div>
       )}
@@ -60,79 +100,121 @@ function CardItem({ card }) {
   )
 }
 
-// Daily Digest strip
+/* ── Daily Digest ── */
 function DigestStrip({ cards, onDismiss }) {
   const navigate = useNavigate()
   return (
-    <div className="mb-6 animate-fade-up">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>今日回顾</span>
-          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-pale)', color: 'var(--accent)' }}>
-            {cards.length} 张
+    <div className="mb-10 anim-fade">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-baseline gap-3">
+          <span
+            className="font-display text-sm"
+            style={{ color: 'var(--text-2)', fontStyle: 'italic', fontWeight: 400 }}
+          >
+            今日回顾
+          </span>
+          <span
+            className="text-[10px] tracking-[0.12em] uppercase"
+            style={{ color: 'var(--text-3)' }}
+          >
+            {cards.length} 张待阅
           </span>
         </div>
         <button
           onClick={onDismiss}
-          className="text-xs transition-opacity hover:opacity-70"
-          style={{ color: 'var(--text-ghost)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          className="text-[10px] tracking-wider uppercase transition-colors duration-200"
+          style={{
+            color: 'var(--text-3)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'inherit', letterSpacing: '0.1em',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
         >
-          关闭 ×
+          关闭
         </button>
       </div>
-      <div className="flex gap-3 overflow-x-auto tags-scroll pb-1">
-        {cards.map((card) => (
+
+      <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+        {cards.map((card, i) => (
           <div
             key={card.id}
-            className="glass-card flex-shrink-0 w-60 p-4 card-hover"
-            style={{ borderLeft: '3px solid var(--accent)', boxShadow: '0 4px 20px rgba(107,127,106,0.1)' }}
+            className={`flex-shrink-0 w-56 cursor-pointer anim-fade delay-${i + 1}`}
+            style={{
+              background: 'var(--surface)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--radius-md)',
+              padding: '16px 18px',
+              borderTop: '2px solid var(--accent)',
+              transition: 'transform 0.4s cubic-bezier(0.23,1,0.32,1)',
+            }}
             onClick={() => navigate(`/space/card/${card.id}`)}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
           >
-            <p className="text-xs font-light mb-2 truncate" style={{ color: 'var(--text-ghost)' }}>
+            <p
+              className="text-[9px] tracking-[0.12em] uppercase mb-2"
+              style={{ color: 'var(--text-3)', fontWeight: 400 }}
+            >
               {card.sourceIcon} {card.sourcePlatform}
             </p>
-            <h4 className="text-sm font-medium mb-2 line-clamp-2 leading-snug" style={{ color: 'var(--text-primary)' }}>
+            <h4
+              className="font-display text-sm leading-snug mb-2 line-clamp-2"
+              style={{ color: 'var(--text-1)', fontWeight: 400 }}
+            >
               {card.title}
             </h4>
-            <p className="text-xs font-light line-clamp-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            <p
+              className="text-[11px] leading-relaxed line-clamp-3"
+              style={{ color: 'var(--text-2)' }}
+            >
               {card.summary?.coreIdea}
             </p>
           </div>
         ))}
       </div>
+
+      {/* Separator */}
+      <div className="mt-8 mb-2 flex items-center gap-4">
+        <div className="flex-1 h-px" style={{ background: 'var(--line)' }} />
+        <span
+          className="text-[9px] tracking-[0.2em] uppercase"
+          style={{ color: 'var(--text-3)' }}
+        >
+          全部资产
+        </span>
+        <div className="flex-1 h-px" style={{ background: 'var(--line)' }} />
+      </div>
     </div>
   )
 }
 
+/* ── Page ── */
 export function SpacePage() {
   const {
-    cards,
-    selectedTags,
-    toggleTag,
-    clearTags,
-    digestDismissedDate,
-    dismissDigest,
-    isDigestVisible,
-    digestCardIds,
-    openCapture,
+    cards, selectedTags, toggleTag, clearTags,
+    isDigestVisible, dismissDigest, digestCardIds, openCapture,
   } = useStore()
 
   const allTags = getAllTags(cards)
   const filtered = filterCards(cards, selectedTags, '')
-  const digestCards = cards.filter((c) => digestCardIds.includes(c.id) && c.status === 'done')
+  const digestCards = cards.filter(c => digestCardIds.includes(c.id) && c.status === 'done')
   const showDigest = isDigestVisible() && digestCards.length > 0
 
   return (
-    <div className="px-6 py-6 max-w-5xl mx-auto">
-      {/* Digest */}
-      {showDigest && <DigestStrip cards={digestCards} onDismiss={dismissDigest} />}
+    <div className="px-7 pt-7 pb-16 max-w-5xl mx-auto">
+
+      {showDigest && (
+        <DigestStrip cards={digestCards} onDismiss={dismissDigest} />
+      )}
 
       {/* Tag filters */}
       {allTags.length > 0 && (
-        <div className="flex items-center gap-2 mb-6 tags-scroll">
+        <div className="flex items-center gap-2 mb-7 overflow-x-auto no-scrollbar">
           <button
             onClick={clearTags}
-            className={`tag-pill flex-shrink-0 ${selectedTags.length === 0 ? 'active' : ''}`}
+            className={`m-tag flex-shrink-0 ${selectedTags.length === 0 ? 'active' : ''}`}
           >
             全部
           </button>
@@ -140,44 +222,66 @@ export function SpacePage() {
             <button
               key={tag}
               onClick={() => toggleTag(tag)}
-              className={`tag-pill flex-shrink-0 ${selectedTags.includes(tag) ? 'active' : ''}`}
+              className={`m-tag flex-shrink-0 ${selectedTags.includes(tag) ? 'active' : ''}`}
             >
               {tag}
-              <span className="opacity-60 text-[10px]">{count}</span>
+              <span style={{ opacity: 0.5, fontSize: 9 }}>{count}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Cards grid */}
-      {filtered.length === 0 ? (
-        <EmptyState openCapture={openCapture} />
-      ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-          {filtered.map((card) => (
-            <div key={card.id} className="break-inside-avoid animate-fall-in">
-              <CardItem card={card} />
-            </div>
-          ))}
-        </div>
+      {/* Card count */}
+      {filtered.length > 0 && (
+        <p
+          className="text-[10px] tracking-[0.1em] uppercase mb-5"
+          style={{ color: 'var(--text-3)', fontWeight: 400 }}
+        >
+          {filtered.length} 张卡片
+          {selectedTags.length > 0 && ` · 筛选: ${selectedTags.join(', ')}`}
+        </p>
       )}
+
+      {/* Cards grid */}
+      {filtered.length === 0
+        ? <EmptyState openCapture={openCapture} />
+        : (
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
+            {filtered.map((card, i) => (
+              <div key={card.id} className="break-inside-avoid">
+                <CardItem card={card} index={i} />
+              </div>
+            ))}
+          </div>
+        )
+      }
     </div>
   )
 }
 
 function EmptyState({ openCapture }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-up">
-      <div className="text-5xl mb-5 animate-float">🌿</div>
-      <h2 className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>你的房间还很安静</h2>
-      <p className="text-sm font-light mb-1 max-w-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        粘贴一个链接，或输入一段文字，让 AI 帮你整理成精华卡片
+    <div className="flex flex-col items-center justify-center py-32 text-center anim-fade">
+      <p
+        className="font-display text-4xl mb-4"
+        style={{ color: 'var(--text-3)', fontWeight: 400, fontStyle: 'italic', letterSpacing: '-0.02em' }}
+      >
+        空
       </p>
-      <p className="text-xs mb-6" style={{ color: 'var(--text-ghost)' }}>
-        粘贴链接 → AI 自动整理 → 定期唤醒
+      <p
+        className="text-sm font-normal mb-1.5"
+        style={{ color: 'var(--text-2)', fontWeight: 400, lineHeight: 1.9 }}
+      >
+        这里还没有任何内容
       </p>
-      <button className="btn-primary" onClick={openCapture}>
-        + 采集第一条内容
+      <p
+        className="text-xs mb-8 tracking-wide"
+        style={{ color: 'var(--text-3)', fontWeight: 400 }}
+      >
+        粘贴链接 → AI 蒸馏 → 定期唤醒
+      </p>
+      <button className="m-btn m-btn-primary text-xs" onClick={openCapture} style={{ letterSpacing: '0.06em' }}>
+        采集第一条
       </button>
     </div>
   )

@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { MOCK_CARDS, DAILY_DIGEST_IDS } from '../data/mockCards'
 
+// Bump this version whenever mock data changes — forces cache refresh
+const STORE_VERSION = 3
+
 const useStore = create(
   persist(
     (set, get) => ({
@@ -68,19 +71,68 @@ const useStore = create(
       openCapture: () => set({ captureOpen: true }),
       closeCapture: () => set({ captureOpen: false }),
 
-      // Search overlay
+      // Search overlay (legacy, kept for SearchOverlay component)
       searchOpen: false,
       openSearch: () => set({ searchOpen: true }),
       closeSearch: () => set({ searchOpen: false }),
+
+      // Knowledge drawer
+      drawerOpen: false,
+      drawerMode: 'local', // 'local' | 'online'
+      openDrawer: () => set({ drawerOpen: true }),
+      closeDrawer: () => set({ drawerOpen: false }),
+      toggleDrawerMode: () => set((s) => ({ drawerMode: s.drawerMode === 'local' ? 'online' : 'local' })),
+
+      // Chat sessions (persisted)
+      chatSessions: [],       // [{ id, title, messages, mode, createdAt, updatedAt }]
+      activeChatId: null,     // current session id, null = new unsaved chat
+      lastChatTimestamp: null, // ISO string — last time user sent a message
+
+      createChatSession: (mode) => {
+        const id = 'chat-' + Date.now().toString(36)
+        const now = new Date().toISOString()
+        const session = { id, title: '新对话', messages: [], mode: mode || 'local', createdAt: now, updatedAt: now }
+        set((s) => ({ chatSessions: [session, ...s.chatSessions], activeChatId: id }))
+        return id
+      },
+      updateChatSession: (id, messages) => {
+        const now = new Date().toISOString()
+        set((s) => {
+          const sessions = s.chatSessions.map(sess => {
+            if (sess.id !== id) return sess
+            // Auto-title from first user message
+            const firstUser = messages.find(m => m.role === 'user')
+            const title = firstUser ? firstUser.text.slice(0, 24) + (firstUser.text.length > 24 ? '…' : '') : sess.title
+            return { ...sess, messages, title, updatedAt: now }
+          })
+          return { chatSessions: sessions, lastChatTimestamp: now }
+        })
+      },
+      deleteChatSession: (id) => set((s) => ({
+        chatSessions: s.chatSessions.filter(sess => sess.id !== id),
+        activeChatId: s.activeChatId === id ? null : s.activeChatId,
+      })),
+      setActiveChatId: (id) => set({ activeChatId: id }),
     }),
     {
       name: 'minusroom-store',
+      version: STORE_VERSION,
       partialize: (s) => ({
         user: s.user,
         theme: s.theme,
         cards: s.cards,
         digestDismissedDate: s.digestDismissedDate,
+        chatSessions: s.chatSessions,
+        activeChatId: s.activeChatId,
+        lastChatTimestamp: s.lastChatTimestamp,
       }),
+      migrate: (persisted, version) => {
+        // When version changes, reset cards to latest mock data
+        if (version < STORE_VERSION) {
+          return { ...persisted, cards: MOCK_CARDS }
+        }
+        return persisted
+      },
       onRehydrateStorage: () => (state) => {
         if (state?.theme === 'dark') {
           document.documentElement.classList.add('dark')

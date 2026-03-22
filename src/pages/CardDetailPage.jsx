@@ -1,13 +1,37 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import useStore from '../store/useStore'
 import { formatRelativeTime, getRelatedCards } from '../utils/helpers'
+
+/* ── Section label ── */
+const Label = ({ children }) => (
+  <p
+    className="text-[9px] tracking-[0.18em] uppercase mb-3"
+    style={{ color: 'var(--text-3)', fontWeight: 400 }}
+  >
+    {children}
+  </p>
+)
+
+/* ── Divider ── */
+const Divider = () => (
+  <div className="my-7" style={{ borderTop: '1px solid var(--line)' }} />
+)
 
 export function CardDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fromTags = searchParams.get('from') === 'tags'
+  const fromTag = searchParams.get('tag') || ''
   const { cards, updateCard, deleteCard, addToast } = useStore()
-  const card = cards.find((c) => c.id === id)
+  const card = cards.find(c => c.id === id)
+
+  // Scroll to top when card changes (e.g. navigating from Agent drawer)
+  useEffect(() => {
+    const mainEl = document.getElementById('main-scroll')
+    if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'instant' })
+  }, [id])
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleVal, setTitleVal] = useState('')
@@ -16,7 +40,7 @@ export function CardDetailPage() {
   const [newTag, setNewTag] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [relatedOffset, setRelatedOffset] = useState(0)
+  const [exiting, setExiting] = useState(false)
 
   useEffect(() => {
     if (card) {
@@ -28,76 +52,130 @@ export function CardDetailPage() {
 
   if (!card) return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <p className="text-sm mb-3" style={{ color: 'var(--text-ghost)' }}>卡片不存在或已被删除</p>
-        <button className="btn-ghost" onClick={() => navigate('/space')}>返回我的空间</button>
+      <div className="text-center anim-fade">
+        <p className="text-sm font-normal mb-4" style={{ color: 'var(--text-3)' }}>卡片不存在</p>
+        <button className="m-btn m-btn-ghost text-xs" onClick={() => navigate('/space')}>
+          返回
+        </button>
       </div>
     </div>
   )
 
-  const related = getRelatedCards(cards, id, 4)
-  const shownRelated = related.slice(relatedOffset, relatedOffset + 4)
+  const related = getRelatedCards(cards, id, 20)
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 4
+  const totalPages = Math.ceil(related.length / PAGE_SIZE)
+  const isLastPage = page >= totalPages - 1
+
+  const shownRelated = related.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  // Reset page when navigating to different card
+  useEffect(() => { setPage(0) }, [id])
 
   const saveTitle = () => {
     if (titleVal.trim()) updateCard(id, { title: titleVal.trim() })
     setEditingTitle(false)
   }
-
   const saveNote = () => {
     updateCard(id, { note: noteVal })
     setEditingNote(false)
-    addToast({ message: '备注已保存' })
+    addToast({ message: '备注已更新' })
   }
-
   const removeTag = (tag) => {
-    updateCard(id, { tags: card.tags.filter((t) => t !== tag) })
+    updateCard(id, { tags: card.tags.filter(t => t !== tag) })
   }
-
   const addTag = (e) => {
     e.preventDefault()
     const t = newTag.trim()
-    if (t && !card.tags?.includes(t)) {
-      updateCard(id, { tags: [...(card.tags || []), t] })
-    }
-    setNewTag('')
-    setShowTagInput(false)
+    if (t && !card.tags?.includes(t)) updateCard(id, { tags: [...(card.tags || []), t] })
+    setNewTag(''); setShowTagInput(false)
   }
-
   const handleDelete = () => {
-    deleteCard(id)
-    addToast({ message: '卡片已删除' })
-    navigate('/space')
+    setExiting(true)
+    setTimeout(() => {
+      deleteCard(id)
+      addToast({ message: '卡片已散去' })
+      navigate('/space')
+    }, 500)
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-6 animate-fade-up">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs mb-6" style={{ color: 'var(--text-ghost)' }}>
-        <Link to="/space" style={{ color: 'var(--text-ghost)', textDecoration: 'none' }} className="hover:text-[var(--accent)] transition-colors">
-          我的空间
-        </Link>
-        <span>›</span>
-        <span className="truncate max-w-xs" style={{ color: 'var(--text-secondary)' }}>{card.title}</span>
+    <div
+      className={`max-w-2xl mx-auto px-8 py-8 anim-drift ${exiting ? 'anim-dust' : ''}`}
+      style={{ transition: 'opacity 0.5s ease' }}
+    >
+      {/* Breadcrumb — adapts to navigation source */}
+      <div className="flex items-center gap-2 mb-8">
+        {fromTags ? (
+          <>
+            <Link
+              to="/tags"
+              className="text-[10px] tracking-[0.12em] uppercase transition-colors duration-200"
+              style={{ color: 'var(--text-3)', textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+            >
+              标签库
+            </Link>
+            {fromTag && (
+              <>
+                <span style={{ color: 'var(--text-3)', fontSize: 10 }}>›</span>
+                <Link
+                  to={`/tags?selected=${encodeURIComponent(fromTag)}`}
+                  className="text-[10px] tracking-[0.10em] transition-colors duration-200"
+                  style={{ color: 'var(--text-3)', textDecoration: 'none' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+                >
+                  {fromTag}
+                </Link>
+              </>
+            )}
+          </>
+        ) : (
+          <Link
+            to="/space"
+            className="text-[10px] tracking-[0.12em] uppercase transition-colors duration-200"
+            style={{ color: 'var(--text-3)', textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+          >
+            我的空间
+          </Link>
+        )}
+        <span style={{ color: 'var(--text-3)', fontSize: 10 }}>›</span>
+        <span
+          className="text-[10px] tracking-wide truncate max-w-xs"
+          style={{ color: 'var(--text-2)' }}
+        >
+          {card.title}
+        </span>
       </div>
 
       {/* Title */}
-      <div className="mb-4">
+      <div className="mb-5">
         {editingTitle ? (
           <input
             autoFocus
-            className="input-field text-xl font-medium"
+            className="m-input font-display"
             value={titleVal}
-            onChange={(e) => setTitleVal(e.target.value)}
+            onChange={e => setTitleVal(e.target.value)}
             onBlur={saveTitle}
-            onKeyDown={(e) => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
-            style={{ fontSize: 20, fontWeight: 500, padding: '8px 12px' }}
+            onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
+            style={{ fontSize: 22, fontWeight: 400, fontStyle: 'italic', letterSpacing: '-0.01em', padding: '8px 12px' }}
           />
         ) : (
           <h1
-            className="text-xl font-medium leading-snug cursor-text"
-            style={{ color: 'var(--text-primary)' }}
+            className="font-display cursor-text"
+            style={{
+              fontSize: 24,
+              fontWeight: 400,
+              fontStyle: 'italic',
+              letterSpacing: '-0.01em',
+              lineHeight: 1.35,
+              color: 'var(--text-1)',
+            }}
             onClick={() => setEditingTitle(true)}
-            title="点击编辑标题"
           >
             {card.title}
           </h1>
@@ -105,24 +183,30 @@ export function CardDetailPage() {
       </div>
 
       {/* Meta */}
-      <div className="flex items-center gap-3 mb-6 text-xs" style={{ color: 'var(--text-ghost)' }}>
-        <span>{card.sourceIcon} {card.sourcePlatform}</span>
-        <span>·</span>
-        <span>{formatRelativeTime(card.createdAt)}</span>
+      <div className="flex items-center gap-3 mb-8 flex-wrap">
+        <span className="text-[10px] tracking-wider" style={{ color: 'var(--accent)' }}>
+          {card.sourceIcon}
+        </span>
+        <span className="text-[10px] tracking-[0.08em] uppercase" style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+          {card.sourcePlatform}
+        </span>
+        <span style={{ color: 'var(--line)', fontSize: 8 }}>●</span>
+        <span className="text-[10px]" style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+          {formatRelativeTime(card.createdAt)}
+        </span>
         {card.sourceUrl && (
           <>
-            <span>·</span>
+            <span style={{ color: 'var(--line)', fontSize: 8 }}>●</span>
             <a
               href={card.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 transition-colors"
-              style={{ color: 'var(--text-ghost)', textDecoration: 'none' }}
+              className="text-[10px] tracking-[0.06em] uppercase transition-colors duration-200"
+              style={{ color: 'var(--text-3)', textDecoration: 'none' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-ghost)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
             >
-              查看原文
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              原文 ↗
             </a>
           </>
         )}
@@ -130,40 +214,48 @@ export function CardDetailPage() {
 
       {/* AI Summary */}
       {card.status === 'processing' ? (
-        <div className="ai-section mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
-            <span className="text-xs" style={{ color: 'var(--accent)' }}>AI 正在整理内容…</span>
+        <div className="ai-zone mb-7">
+          <div className="flex items-center gap-2.5 mb-4">
+            <span className="processing-ring" />
+            <span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: 'var(--accent)', fontWeight: 400 }}>
+              AI 整理中
+            </span>
           </div>
-          <div className="shimmer-bg h-4 rounded-lg mb-2 w-4/5" />
-          <div className="shimmer-bg h-3 rounded-lg mb-1.5 w-full" />
-          <div className="shimmer-bg h-3 rounded-lg w-2/3" />
-        </div>
-      ) : card.status === 'failed' ? (
-        <div className="ai-section mb-5" style={{ borderColor: 'rgba(192,57,43,0.2)' }}>
-          <p className="text-xs" style={{ color: '#C0392B' }}>AI 处理失败，以下为原始采集内容</p>
+          <div className="m-shimmer h-3 w-4/5 mb-2" />
+          <div className="m-shimmer h-2.5 w-full mb-1.5" />
+          <div className="m-shimmer h-2.5 w-3/5" />
         </div>
       ) : card.summary ? (
-        <div className="ai-section mb-5 relative">
-          <div className="absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(107,127,106,0.15)', color: 'var(--accent)' }}>
+        <div className="ai-zone mb-7 relative">
+          <div
+            className="absolute top-4 right-4 text-[9px] tracking-[0.15em] uppercase"
+            style={{ color: 'var(--text-3)', fontWeight: 400 }}
+          >
             AI 生成
           </div>
 
           {/* Core idea */}
-          <div className="mb-4">
-            <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--accent)', opacity: 0.7 }}>核心观点</p>
-            <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+          <div className="mb-5 pr-10">
+            <Label>核心观点</Label>
+            <p
+              className="font-display text-lg leading-relaxed"
+              style={{ color: 'var(--text-1)', fontWeight: 400, fontStyle: 'italic', lineHeight: 1.6 }}
+            >
               {card.summary.coreIdea}
             </p>
           </div>
 
           {/* Key points */}
-          <div className="mb-4">
-            <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--accent)', opacity: 0.7 }}>关键信息</p>
-            <ul className="space-y-2">
+          <div className="mb-5">
+            <Label>关键信息</Label>
+            <ul className="space-y-2.5">
               {card.summary.keyPoints.map((pt, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm font-light leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--accent)', opacity: 0.6 }} />
+                <li
+                  key={i}
+                  className="flex items-start gap-3 text-xs font-light leading-relaxed"
+                  style={{ color: 'var(--text-2)', lineHeight: 1.8 }}
+                >
+                  <span style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 6, fontSize: 6 }}>●</span>
                   {pt}
                 </li>
               ))}
@@ -172,94 +264,123 @@ export function CardDetailPage() {
 
           {/* Quote */}
           {card.summary.quote && (
-            <blockquote
-              className="text-sm font-light leading-relaxed pl-4 italic"
-              style={{
-                borderLeft: '2px solid var(--accent)',
-                color: 'var(--text-secondary)',
-                opacity: 0.9,
-              }}
-            >
-              {card.summary.quote}
-            </blockquote>
+            <div>
+              <Label>原文金句</Label>
+              <blockquote
+                className="text-sm font-normal leading-relaxed pl-4"
+                style={{
+                  borderLeft: '2px solid var(--accent)',
+                  color: 'var(--text-2)',
+                  fontStyle: 'italic',
+                  lineHeight: 1.8,
+                  opacity: 0.85,
+                }}
+              >
+                {card.summary.quote}
+              </blockquote>
+            </div>
           )}
+        </div>
+      ) : card.status === 'failed' ? (
+        <div
+          className="mb-7 p-5 rounded-xl text-xs font-light"
+          style={{ background: 'rgba(160,96,96,0.06)', border: '1px solid rgba(160,96,96,0.15)', color: '#A06060' }}
+        >
+          AI 处理失败，仅保存了原始采集内容
         </div>
       ) : null}
 
+      <Divider />
+
       {/* Tags */}
-      <div className="mb-5">
-        <p className="text-xs font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-ghost)' }}>标签</p>
+      <div className="mb-7">
+        <Label>标签</Label>
         <div className="flex flex-wrap gap-2 items-center">
-          {(card.tags || []).map((tag) => (
-            <span key={tag} className="tag-pill active" style={{ cursor: 'default' }}>
+          {(card.tags || []).map(tag => (
+            <span key={tag} className="m-tag active">
               {tag}
               <button
                 onClick={() => removeTag(tag)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white', opacity: 0.7, padding: 0, lineHeight: 1, marginLeft: 2 }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'inherit', opacity: 0.6, padding: 0, lineHeight: 1,
+                  marginLeft: 2, fontSize: 11,
+                }}
               >×</button>
             </span>
           ))}
           {showTagInput ? (
-            <form onSubmit={addTag} className="flex items-center gap-1">
+            <form onSubmit={addTag}>
               <input
                 autoFocus
                 value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
+                onChange={e => setNewTag(e.target.value)}
                 onBlur={() => { if (!newTag.trim()) setShowTagInput(false) }}
                 placeholder="输入标签…"
-                className="text-xs px-2 py-1 rounded-lg outline-none"
                 style={{
-                  background: 'var(--bg-deep)',
+                  fontSize: 11, padding: '3px 10px', borderRadius: 99,
+                  background: 'var(--bg-2)',
                   border: '1px solid var(--accent)',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit',
-                  width: 100,
+                  color: 'var(--text-1)',
+                  outline: 'none', fontFamily: 'inherit', width: 90,
                 }}
               />
             </form>
           ) : (
             <button
               onClick={() => setShowTagInput(true)}
-              className="tag-pill"
-              style={{ opacity: 0.6, border: '1px dashed var(--accent)' }}
+              className="m-tag"
+              style={{ opacity: 0.5, borderStyle: 'dashed' }}
             >
-              + 添加标签
+              + 添加
             </button>
           )}
         </div>
       </div>
 
+      <Divider />
+
       {/* Note */}
-      <div className="mb-6">
-        <p className="text-xs font-medium uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-ghost)' }}>我的备注</p>
+      <div className="mb-7">
+        <Label>我的备注</Label>
         {editingNote ? (
           <div>
             <textarea
               autoFocus
-              className="input-field resize-none mb-2"
-              rows={4}
+              className="m-input resize-none mb-3"
+              rows={5}
               value={noteVal}
-              onChange={(e) => setNoteVal(e.target.value)}
+              onChange={e => setNoteVal(e.target.value)}
               placeholder="记录你的想法、解读、使用场景…"
-              style={{ lineHeight: 1.7 }}
+              style={{ fontSize: 13, fontWeight: 400, lineHeight: 1.9 }}
             />
             <div className="flex gap-2">
-              <button className="btn-primary" style={{ fontSize: 12, padding: '7px 14px' }} onClick={saveNote}>保存</button>
-              <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} onClick={() => { setEditingNote(false); setNoteVal(card.note || '') }}>取消</button>
+              <button className="m-btn m-btn-primary text-xs" style={{ padding: '7px 16px' }} onClick={saveNote}>
+                保存
+              </button>
+              <button
+                className="m-btn m-btn-ghost text-xs"
+                style={{ padding: '7px 16px' }}
+                onClick={() => { setEditingNote(false); setNoteVal(card.note || '') }}
+              >
+                取消
+              </button>
             </div>
           </div>
         ) : (
           <div
-            className="text-sm font-light leading-relaxed cursor-text rounded-xl px-4 py-3 transition-all"
+            className="text-sm font-normal leading-relaxed cursor-text rounded-xl px-4 py-3.5 transition-all duration-300"
             style={{
-              color: noteVal ? 'var(--text-secondary)' : 'var(--text-ghost)',
-              background: 'var(--bg-deep)',
-              border: '1px solid var(--border)',
-              minHeight: 48,
+              color: noteVal ? 'var(--text-2)' : 'var(--text-3)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--line)',
+              minHeight: 52,
+              lineHeight: 1.9,
+              fontWeight: 400,
             }}
             onClick={() => setEditingNote(true)}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(139,126,116,0.30)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--line)'}
           >
             {noteVal || '添加你的想法…'}
           </div>
@@ -267,57 +388,112 @@ export function CardDetailPage() {
       </div>
 
       {/* Delete */}
-      <div className="pb-4 border-t pt-5" style={{ borderColor: 'var(--border)' }}>
-        <button className="btn-danger" style={{ fontSize: 13 }} onClick={() => setShowDeleteModal(true)}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-          删除卡片
-        </button>
-      </div>
+      <Divider />
+      <button
+        className="m-btn m-btn-danger text-xs"
+        style={{ fontSize: 11, padding: '7px 16px', letterSpacing: '0.04em' }}
+        onClick={() => setShowDeleteModal(true)}
+      >
+        删除卡片
+      </button>
 
       {/* Related */}
       {cards.filter(c => c.status === 'done').length >= 10 && shownRelated.length > 0 && (
-        <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>相关内容</p>
-            {related.length > 4 && (
-              <button
-                className="text-xs transition-colors"
-                style={{ color: 'var(--text-ghost)', background: 'none', border: 'none', cursor: 'pointer' }}
-                onClick={() => setRelatedOffset((relatedOffset + 4) % related.length)}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-ghost)'}
-              >
-                换一批 →
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {shownRelated.map((r) => (
-              <div
-                key={r.id}
-                className="glass-card p-4 card-hover"
-                onClick={() => { navigate(`/space/card/${r.id}`); window.scrollTo(0, 0) }}
-              >
-                <p className="text-xs mb-1.5" style={{ color: 'var(--text-ghost)' }}>{r.sourceIcon} {r.sourcePlatform}</p>
-                <p className="text-sm font-medium mb-1.5 line-clamp-2 leading-snug" style={{ color: 'var(--text-primary)' }}>{r.title}</p>
-                <p className="text-xs font-light line-clamp-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{r.summary?.coreIdea}</p>
+        <>
+          <Divider />
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-baseline gap-3">
+                <Label>相关内容</Label>
+                <span className="text-[9px] tracking-[0.08em]" style={{ color: 'var(--text-3)' }}>
+                  {related.length} 张相关
+                </span>
               </div>
-            ))}
+              <div className="flex items-center gap-3">
+                {totalPages > 1 && (
+                  <>
+                    {page > 0 && (
+                      <button
+                        className="text-[9px] tracking-[0.12em] uppercase transition-colors duration-200"
+                        style={{ color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onClick={() => setPage(p => p - 1)}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+                      >
+                        ← 上一页
+                      </button>
+                    )}
+                    <span className="text-[9px] tracking-[0.08em]" style={{ color: 'var(--text-3)' }}>
+                      {page + 1} / {totalPages}
+                    </span>
+                    {!isLastPage && (
+                      <button
+                        className="text-[9px] tracking-[0.12em] uppercase transition-colors duration-200"
+                        style={{ color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onClick={() => setPage(p => p + 1)}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+                      >
+                        下一页 →
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {shownRelated.map((r, i) => (
+                <div
+                  key={r.id}
+                  className={`m-card p-4 cursor-pointer anim-fade delay-${i + 1}`}
+                  onClick={() => { navigate(`/space/card/${r.id}`); document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                >
+                  <p className="text-[9px] tracking-wider uppercase mb-2" style={{ color: 'var(--text-3)' }}>
+                    {r.sourceIcon} {r.sourcePlatform}
+                  </p>
+                  <p className="font-display text-sm leading-snug mb-2 line-clamp-2" style={{ color: 'var(--text-1)', fontWeight: 400 }}>
+                    {r.title}
+                  </p>
+                  <p className="text-[11px] line-clamp-2 leading-relaxed" style={{ color: 'var(--text-3)' }}>
+                    {r.summary?.coreIdea}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Delete modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="glass-card p-6 w-full max-w-sm mx-4 animate-slide-in" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-medium mb-2" style={{ color: 'var(--text-primary)' }}>确认删除</h3>
-            <p className="text-sm font-light mb-5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              删除后无法恢复，确定要删除这张卡片吗？
+        <div className="m-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div
+            className="anim-drift w-full max-w-sm mx-4"
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '28px',
+              boxShadow: 'var(--shadow-lg)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3
+              className="font-display text-lg mb-2"
+              style={{ color: 'var(--text-1)', fontWeight: 400, fontStyle: 'italic' }}
+            >
+              删除这张卡片？
+            </h3>
+            <p className="text-xs leading-relaxed mb-6" style={{ color: 'var(--text-3)', lineHeight: 1.9 }}>
+              卡片将如尘埃般消散，无法恢复。
             </p>
             <div className="flex gap-2 justify-end">
-              <button className="btn-ghost" onClick={() => setShowDeleteModal(false)}>取消</button>
-              <button className="btn-danger" onClick={handleDelete}>确认删除</button>
+              <button className="m-btn m-btn-ghost text-xs" style={{ padding: '8px 18px' }} onClick={() => setShowDeleteModal(false)}>
+                取消
+              </button>
+              <button className="m-btn m-btn-danger text-xs" style={{ padding: '8px 18px' }} onClick={handleDelete}>
+                确认删除
+              </button>
             </div>
           </div>
         </div>

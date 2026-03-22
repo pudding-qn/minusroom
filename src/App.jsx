@@ -9,6 +9,7 @@ import { CardDetailPage } from './pages/CardDetailPage'
 import { TagsPage } from './pages/TagsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
+import { GuidePage } from './pages/GuidePage'
 
 function RequireAuth({ children }) {
   const user = useStore((s) => s.user)
@@ -24,6 +25,7 @@ function AppWithShell() {
           <Route path="/space" element={<SpacePage />} />
           <Route path="/space/card/:id" element={<CardDetailPage />} />
           <Route path="/tags" element={<TagsPage />} />
+          <Route path="/guide" element={<GuidePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

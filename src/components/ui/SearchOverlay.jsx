@@ -10,71 +10,126 @@ export function SearchOverlay() {
 
   if (!searchOpen) return null
 
-  const results = q.trim() ? filterCards(cards.filter(c => c.status === 'done'), [], q).slice(0, 8) : []
+  const results = q.trim()
+    ? filterCards(cards.filter(c => c.status === 'done'), [], q).slice(0, 7)
+    : []
 
-  const go = (id) => {
-    navigate(`/space/card/${id}`)
-    closeSearch()
-    setQ('')
-  }
+  const go = (id) => { navigate(`/space/card/${id}`); closeSearch(); setQ('') }
 
-  const highlight = (text, query) => {
-    if (!query || !text) return text
-    const idx = text.toLowerCase().indexOf(query.toLowerCase())
-    if (idx === -1) return text.slice(0, 80)
-    const start = Math.max(0, idx - 20)
-    const end = Math.min(text.length, idx + query.length + 40)
-    const pre = text.slice(start, idx)
-    const match = text.slice(idx, idx + query.length)
-    const post = text.slice(idx + query.length, end)
-    return <span>{start > 0 && '…'}{pre}<mark style={{ background: 'var(--accent-pale)', color: 'var(--accent)', borderRadius: 3, padding: '0 2px' }}>{match}</mark>{post}{end < text.length && '…'}</span>
+  const hl = (text, query) => {
+    if (!query || !text) return (text || '').slice(0, 80)
+    const i = text.toLowerCase().indexOf(query.toLowerCase())
+    if (i === -1) return text.slice(0, 80)
+    const s = Math.max(0, i - 20), e = Math.min(text.length, i + query.length + 40)
+    return (
+      <>
+        {s > 0 && '…'}
+        {text.slice(s, i)}
+        <mark style={{ background: 'rgba(139,126,116,0.20)', color: 'var(--accent)', borderRadius: 2, padding: '0 1px' }}>
+          {text.slice(i, i + query.length)}
+        </mark>
+        {text.slice(i + query.length, e)}
+        {e < text.length && '…'}
+      </>
+    )
   }
 
   return (
-    <div className="modal-overlay items-start pt-24" onClick={(e) => e.target === e.currentTarget && closeSearch()}>
-      <div className="glass-card w-full max-w-xl mx-4 animate-slide-in overflow-hidden" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-        <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-ghost)', flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    <div
+      className="m-overlay"
+      style={{ alignItems: 'flex-start', paddingTop: '18vh' }}
+      onClick={(e) => e.target === e.currentTarget && closeSearch()}
+    >
+      <div
+        className="anim-drift w-full max-w-lg mx-6 overflow-hidden"
+        style={{
+          background: 'var(--bg)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+        {/* Input */}
+        <div
+          className="flex items-center gap-3 px-5 py-4"
+          style={{ borderBottom: results.length > 0 ? '1px solid var(--line)' : 'none' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ color: 'var(--text-3)', flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
           </svg>
           <input
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
-            placeholder="搜索卡片、标签、内容…"
-            className="flex-1 bg-transparent outline-none text-sm"
-            style={{ color: 'var(--text-primary)', fontFamily: 'inherit', fontWeight: 300 }}
+            placeholder="在你的房间里搜索…"
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: 14,
+              fontWeight: 400,
+              color: 'var(--text-1)',
+              fontFamily: 'Geist, sans-serif',
+              letterSpacing: '0.01em',
+            }}
           />
-          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-deep)', color: 'var(--text-ghost)' }}>Esc</span>
+          <kbd
+            style={{
+              fontSize: 10,
+              padding: '2px 6px',
+              borderRadius: 4,
+              background: 'var(--bg-2)',
+              color: 'var(--text-3)',
+              border: '1px solid var(--line)',
+              letterSpacing: '0.05em',
+              fontFamily: 'inherit',
+            }}
+          >
+            esc
+          </kbd>
         </div>
-        <div className="max-h-80 overflow-y-auto">
-          {results.length > 0 ? results.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => go(card.id)}
-              className="w-full text-left px-4 py-3 transition-colors hover:bg-[var(--bg-deep)] flex items-start gap-3"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              <span className="text-lg mt-0.5 flex-shrink-0">{card.sourceIcon}</span>
-              <div className="min-w-0">
-                <div className="text-sm font-medium mb-0.5 truncate" style={{ color: 'var(--text-primary)' }}>
-                  {highlight(card.title, q)}
+
+        {/* Results */}
+        <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+          {results.length > 0
+            ? results.map((card, i) => (
+              <button
+                key={card.id}
+                onClick={() => go(card.id)}
+                className={`anim-fade delay-${Math.min(i + 1, 5)} w-full text-left flex items-start gap-4 px-5 py-3.5 transition-all duration-200`}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  borderBottom: i < results.length - 1 ? '1px solid var(--line-2)' : 'none',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <span style={{ color: 'var(--accent)', fontSize: 13, marginTop: 2, flexShrink: 0 }}>{card.sourceIcon}</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-normal mb-0.5 truncate" style={{ color: 'var(--text-1)', fontWeight: 400 }}>
+                    {hl(card.title, q)}
+                  </div>
+                  <div className="text-xs leading-relaxed" style={{ color: 'var(--text-3)' }}>
+                    {hl(card.summary?.coreIdea || '', q)}
+                  </div>
                 </div>
-                <div className="text-xs leading-relaxed" style={{ color: 'var(--text-ghost)' }}>
-                  {highlight(card.summary?.coreIdea || '', q)}
+              </button>
+            ))
+            : q.trim()
+              ? (
+                <div className="px-5 py-10 text-center text-xs font-light tracking-wide" style={{ color: 'var(--text-3)' }}>
+                  无结果 —— 试试其他关键词
                 </div>
-              </div>
-            </button>
-          )) : q.trim() ? (
-            <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-ghost)' }}>
-              未找到与「{q}」相关的内容
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-center text-sm" style={{ color: 'var(--text-ghost)' }}>
-              输入关键词，搜索你的资产库
-            </div>
-          )}
+              )
+              : (
+                <div className="px-5 py-10 text-center text-xs font-light tracking-[0.1em] uppercase" style={{ color: 'var(--text-3)' }}>
+                  输入以搜索你的资产库
+                </div>
+              )
+          }
         </div>
       </div>
     </div>
