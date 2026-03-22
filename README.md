@@ -2,6 +2,8 @@
 
 Less Noise, More Room.
 
+访问地址：https://minusroom.pages.dev/auth
+
 minusROOM 是一个面向中文内容场景的 AI 知识蒸馏应用：
 把你每天看到的链接、文字、语音、图片、音视频快速采集进来，自动生成结构化知识卡片，并通过每日回顾、标签导航与问答 Agent 让知识真正被再次使用。
 
